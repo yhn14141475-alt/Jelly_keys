@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jelly Keys</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
+<style>
+/* Material Studies No. 011 — one warm paper sweep; type top-left, a slim control card top-right,
+   the keyboard fills the width below, readouts along the bottom edge. Single light theme by design. */
+:root{
+  --paper:#F2ECE2; --ink:#2B211A; --ink-2:#6F6257; --line:rgba(43,33,26,.17); --panel:rgba(249,245,237,.8);
+  --accent:#D4620A;
+  --display:'Fraunces','Iowan Old Style','Palatino Linotype',Georgia,serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --chip:rgba(255,255,255,.35);
+  color-scheme:light;
+}
+:root.dim{--ink:#F0E8DD;--ink-2:#A99C8F;--line:rgba(240,232,221,.2);--panel:rgba(38,32,28,.74);--chip:rgba(255,255,255,.07);--accent:#F08A2E;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font-family:var(--display);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.stage{position:relative;height:100vh;height:100svh;min-height:600px;overflow:hidden}
+.view{position:absolute;inset:0}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer;outline:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#gl.grabbing{cursor:grabbing}
+#gl[data-tool="knife"]{cursor:crosshair}
+#gl[data-tool="cutter"]{cursor:pointer}
+#stroke{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#stroke line{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:5 5;stroke-linecap:round}
+
+.masthead{position:absolute;left:clamp(18px,3.4vw,52px);top:clamp(16px,2.6vw,36px);max-width:min(56vw,760px);pointer-events:none;display:flex;flex-direction:column;gap:clamp(10px,1.4vw,18px)}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);margin:0}
+.kicker b{font-weight:500;color:var(--accent)}
+h1{font-weight:340;font-size:clamp(40px,5.6vw,88px);line-height:.86;letter-spacing:-.035em;margin:0;font-variation-settings:'opsz' 144;text-wrap:balance}
+h1 em{font-style:italic;font-weight:300;color:var(--accent)}
+.caption{font-size:clamp(15px,1.25vw,19px);line-height:1.35;font-style:italic;color:var(--ink-2);margin:0;max-width:22em}
+.statusrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+#status{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;padding:5px 10px 5px 22px;border:1px solid var(--line);border-radius:99px;position:relative;background:var(--panel);white-space:nowrap}
+#status::before{content:'';position:absolute;left:9px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:var(--accent)}
+#status.paused::before{background:var(--ink-2)}
+#hint{font-family:var(--mono);font-size:11.5px;line-height:1.45;color:var(--ink-2);margin:0;max-width:30em}
+
+.panel{position:absolute;right:clamp(12px,1.6vw,22px);top:clamp(12px,1.6vw,22px);width:232px;max-height:calc(100% - 118px);overflow:auto;background:var(--panel);
+  -webkit-backdrop-filter:blur(14px) saturate(1.1);backdrop-filter:blur(14px) saturate(1.1);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:14px;font-family:var(--mono);font-size:11.5px}
+.group{display:flex;flex-direction:column;gap:7px;border:0;padding:0;margin:0;min-width:0}
+.group>legend,.lab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);padding:0;margin:0 0 7px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px}
+.seg button,.btn{border:1px solid var(--line);background:var(--chip);border-radius:8px;padding:8px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:36px;justify-content:center;line-height:1.1}
+.seg button:hover,.btn:hover{border-color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.seg.var button[aria-pressed="true"]{background:rgba(255,255,255,.7);color:var(--ink);border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.seg.var button{font-size:10px;padding:8px 2px 6px}
+.seg kbd{font:inherit;font-size:9px;opacity:.55}
+#shapes.dim{opacity:.55}
+#shapes svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round}
+.slider{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:baseline}
+.slider label{color:var(--ink)}
+.slider output{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.slider input{grid-column:1/-1;width:100%;margin:0;accent-color:var(--accent);height:18px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.btn.wide{grid-column:1/-1;flex-direction:row;gap:8px}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.checks{display:flex;gap:14px;flex-wrap:wrap}
+.checks label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.checks input{accent-color:var(--accent);width:15px;height:15px;margin:0}
+.keys{color:var(--ink-2);font-size:10px;line-height:1.6;margin:0;border-top:1px solid var(--line);padding-top:10px}
+
+.readouts{position:absolute;left:clamp(18px,3.4vw,52px);right:clamp(12px,1.6vw,22px);bottom:clamp(12px,1.8vw,22px);display:flex;flex-wrap:wrap;gap:8px clamp(18px,3vw,44px);align-items:flex-end;border-top:1px solid var(--line);padding-top:10px;pointer-events:none;margin:0}
+.readouts div{display:flex;flex-direction:column;gap:2px}
+.readouts dt{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.readouts dd{margin:0;font-size:clamp(20px,2vw,28px);font-weight:340;font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
+.readouts dd small{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);margin-left:4px;letter-spacing:.04em}
+.readouts .more{margin-left:auto;pointer-events:auto}
+.readouts a{font-family:var(--mono);font-size:11px;color:var(--ink);text-underline-offset:3px}
+
+#toast{position:absolute;left:50%;bottom:112px;transform:translate(-50%,8px);background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:12px;padding:9px 14px;border-radius:99px;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:calc(100% - 32px);text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.fallback{display:none;position:absolute;inset:0;align-items:center;justify-content:center;text-align:center;padding:24px;flex-direction:column;gap:10px}
+.fallback p{margin:0;font-size:clamp(24px,3vw,36px);font-weight:340}
+.fallback small{font-family:var(--mono);font-size:12px;color:var(--ink-2);max-width:36em;line-height:1.5}
+.nogl .fallback{display:flex}.nogl #gl,.nogl #hint{display:none}
+
+.notes{max-width:1180px;margin:0 auto;padding:clamp(36px,6vw,84px) clamp(18px,3.4vw,52px) clamp(48px,7vw,96px)}
+.notes h2{font-weight:340;font-size:clamp(28px,3.4vw,44px);letter-spacing:-.02em;margin:0 0 clamp(20px,3vw,36px);text-wrap:balance}
+.notes ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:clamp(20px,3vw,40px)}
+.notes li{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.notes h3{font-family:var(--mono);font-weight:500;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin:0;color:var(--accent)}
+.notes p{margin:0;font-size:16.5px;line-height:1.5;max-width:34em}
+
+@media (max-width:820px){
+  .stage{height:auto;min-height:0;overflow:visible;display:flex;flex-direction:column}
+  .view{position:relative;inset:auto;height:50vh;height:50svh;min-height:340px}
+  .masthead{max-width:calc(100% - 36px);gap:8px}
+  h1{font-size:clamp(34px,10.5vw,52px)}
+  .caption{font-size:14px}
+  #hint{font-size:10.5px}
+  .panel{position:static;width:auto;max-height:none;margin:12px 16px 0;border-radius:12px}
+  .readouts{position:static;margin:16px 16px 0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .readouts .more{margin:0;grid-column:1/-1}
+  #toast{bottom:14px}
+  .seg button,.btn{min-height:42px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+#typed{font-size:clamp(17px,1.9vw,27px);line-height:1.25;font-style:italic;margin:0;max-width:26em;white-space:pre-wrap;overflow-wrap:anywhere;max-height:3.75em;overflow:hidden;display:flex;flex-wrap:wrap;align-content:flex-end;color:var(--ink)}
+#typed.empty{color:var(--ink-2)}
+#typed span{min-width:0}
+.caret{display:inline-block;width:2px;height:1.05em;background:var(--accent);margin-left:3px;align-self:flex-end;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (max-width:820px){#typed{font-size:16px}}
+#voice{width:100%;font:inherit;color:inherit;background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:8px 6px;min-height:38px}
+</style>
+</head>
+<body>
+<main class="stage" id="stage">
+  <div class="view">
+    <canvas id="gl" aria-label="A keyboard made of citrus jelly. Press the keys with a finger, the mouse or your own keyboard."></canvas>
+    <header class="masthead" id="masthead">
+      <p class="kicker">Material Studies / <b>No. 011</b> · three.js</p>
+      <h1>Jelly <em>Keys.</em></h1>
+      <p id="typed" class="empty" aria-live="polite"><span></span><i class="caret" aria-hidden="true"></i></p>
+      <div class="statusrow"><span id="status" role="status">THREE.JS · LIVE</span></div>
+    </header>
+    <div class="fallback"><p>These keys need WebGL 2.</p><small>Your browser or graphics driver does not offer WebGL 2 with float render targets. Try a current version of Chrome, Edge, Firefox or Safari with hardware acceleration switched on.</small></div>
+  </div>
+  <aside class="panel" id="panel" aria-label="Controls">
+    <div class="group">
+      <div class="slider"><label for="firm">Firmness</label><output id="firmV" for="firm">0.50</output><input id="firm" type="range" min="0" max="1" step="0.01" value="0.5"></div>
+      <div class="slider"><label for="damp">Internal damping</label><output id="dampV" for="damp">0.50</output><input id="damp" type="range" min="0" max="1" step="0.01" value="0.5"></div>
+    </div>
+    <div class="row">
+      <button type="button" class="btn" id="wave">Make a wave</button>
+      <button type="button" class="btn" id="clear">Clear text</button>
+    </div>
+    <div class="group"><label class="lab" for="voice" style="margin:0">Key sound</label><select id="voice"></select></div>
+    <div class="group"><div class="slider"><label for="jit">Pitch variation</label><output id="jitV" for="jit">±3%</output><input id="jit" type="range" min="0" max="20" step="1" value="3"></div></div>
+    <div class="checks">
+      <label for="sound"><input type="checkbox" id="sound" checked> Sound</label>
+      <label for="steady"><input type="checkbox" id="steady"> Same sound every time</label>
+      <label for="dim"><input type="checkbox" id="dim"> Dim the lights</label>
+      <label for="showmesh"><input type="checkbox" id="showmesh"> Show mesh</label>
+    </div>
+    <p class="keys">Press with a finger, the mouse, or your own keyboard. Hold a key on your keyboard to repeat it. Slide across keys to squash several.<br>Drag empty space to orbit · wheel to zoom</p>
+  </aside>
+  <dl class="readouts" id="readouts">
+    <div><dt>Keystrokes</dt><dd><span id="r-strokes">0</span></dd></div>
+    <div><dt>Keys awake</dt><dd><span id="r-awake">–</span></dd></div>
+    <div><dt>Kinetic energy</dt><dd><span id="r-ke">–</span><small>µJ</small></dd></div>
+    <div><dt>Particles / tets</dt><dd><span id="r-mesh">–</span></dd></div>
+    <div class="more"><a href="#notes">How it works ↓</a></div>
+  </dl>
+</main>
+<section class="notes" id="notes">
+  <h2>Forty-one keys, five flavours, one bowl of jelly</h2>
+  <ol>
+    <li><h3>Keys</h3><p>Every key is a keycap-shaped block of jelly, wider at the base with a shallow dish on top, standing on a plate. Inside it is a lattice of particles split into tetrahedra with the bottom layer stuck down. Keys nobody is touching go to sleep, so only the ones that wobble cost anything.</p></li>
+    <li><h3>Touch</h3><p>A fingertip is a soft sphere that sinks 0.3 units into the jelly. A key types once its top has been pushed down far enough. When you let go the finger lifts rather than vanishes, so the jelly rises a beat behind it, and the neighbouring keys shiver a little with every press.</p></li>
+    <li><h3>Light</h3><p>Rays bend into the jelly at an index of 1.42 and fade by Beer–Lambert absorption. Keys show through one another, each holds a few air bubbles, and the plate underneath catches coloured patches of focused light. A window-shaped softbox mirrors in the dished tops; bloom and a shallow depth of field finish the frame.</p></li>
+    <li><h3>Sound</h3><p>Each press is built on the spot from a bright snap, a short clack and a low thump. Ten voices mix those parts differently, from clicky blue switches to a soft jelly plop. Releasing a key answers more quietly. Each press varies in pitch by the amount you set, and the wide keys sound deeper; “Same sound every time” removes both.</p></li>
+  </ol>
+</section>
+<script type="module">
+import * as THREE from 'three';
+const GL_COMMON = /* glsl */`
+#define PI 3.14159265
+uniform vec3 uSweep;
+float hash11(float p){ p=fract(p*.1031); p*=p+33.33; p*=p+p; return fract(p); }
+float hash21(vec2 p){ vec3 p3=fract(vec3(p.xyx)*.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+float hash31(vec3 p3){ p3=fract(p3*.1031); p3+=dot(p3,p3.zyx+31.32); return fract((p3.x+p3.y)*p3.z); }
+vec3 hash33(vec3 p3){ p3=fract(p3*vec3(.1031,.1030,.0973)); p3+=dot(p3,p3.yxz+33.33); return fract((p3.xxy+p3.yxx)*p3.zyx); }
+float vnoise(vec3 p){
+  vec3 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(mix(hash31(i),hash31(i+vec3(1,0,0)),f.x),mix(hash31(i+vec3(0,1,0)),hash31(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(hash31(i+vec3(0,0,1)),hash31(i+vec3(1,0,1)),f.x),mix(hash31(i+vec3(0,1,1)),hash31(i+vec3(1,1,1)),f.x),f.y),f.z);
+}
+float ign(vec2 p){ return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715)))); }
+float sbox(vec2 p, vec2 c, vec2 hs, float soft){
+  vec2 d=abs(p-c)-hs;
+  return (1.-smoothstep(-soft,soft,d.x))*(1.-smoothstep(-soft,soft,d.y));
+}
+// procedural photo studio: overhead softbox, back strip, side strip, fill card, cream sweep
+vec3 studio(vec3 d, float rough){
+  float soft=mix(.08,2.2,rough);
+  vec3 col=uSweep*mix(.92,.3,smoothstep(-.05,.85,d.y));
+  if(d.y>.02){ vec2 p=d.xz*(4.2/d.y); vec2 wc=vec2(-1.4,-1.9), wh=vec2(2.2,1.5);
+    vec2 gq=abs(fract((p-wc+wh)/(2.*wh)*vec2(3.,2.))-.5);
+    float bars=mix(1.,smoothstep(.45,.49,max(gq.x,gq.y))*-1.+1.,clamp(1.-rough*5.,0.,1.));
+    col+=vec3(1.,.985,.96)*7.5*sbox(p,wc,wh,soft)*bars;
+    col+=vec3(1.,.95,.88)*3.5*sbox(p,vec2(2.6,.6),vec2(.7,.9),soft); }
+  if(d.z<-.02){ vec2 p=d.xy*(6./-d.z); col+=vec3(1.,.97,.93)*4.2*sbox(p,vec2(.6,2.5),vec2(3.6,.45),soft); }
+  if(d.x>.02){ vec2 p=d.zy*(6./d.x); col+=vec3(.95,.97,1.)*3.*sbox(p,vec2(.2,2.6),vec2(.55,2.2),soft); }
+  if(d.x<-.02){ vec2 p=d.zy*(5./-d.x); col+=vec3(1.,.96,.9)*.9*sbox(p,vec2(.5,1.9),vec2(2.6,1.5),soft*1.5); }
+  return col;
+}
+`;
+const FS_SHADOW = /* glsl */`
+uniform float uKind;
+void main(){ gl_FragColor=vec4(gl_FragCoord.z,uKind,0.,1.); }`;
+const FS_BACK = /* glsl */`
+varying float vDepth;
+void main(){ gl_FragColor=vec4(vDepth,0.,0.,1.); }`;
+const FS_NONE = /* glsl */`void main(){ gl_FragColor=vec4(0.); }`;
+const POISSON = /* glsl */`
+const vec2 PD[16]=vec2[16](vec2(-.94201624,-.39906216),vec2(.94558609,-.76890725),vec2(-.094184101,-.9293887),vec2(.34495938,.2938776),
+vec2(-.91588581,.45771432),vec2(-.81544232,-.87912464),vec2(-.38277543,.27676845),vec2(.97484398,.75648379),
+vec2(.44323325,-.97511554),vec2(.53742981,-.4737342),vec2(-.26496911,-.41893023),vec2(.79197514,.19090188),
+vec2(-.2418884,.99706507),vec2(-.81409955,.9143759),vec2(.19984126,.78641367),vec2(.14383161,-.1410079));
+`;
+const VS_FS = /* glsl */`void main(){ gl_Position=vec4(position.xy,0.,1.); }`;
+const FS_POST = /* glsl */`
+uniform sampler2D tComp, tBloom; uniform vec2 uRes; uniform float uFocus, uDofK;
+const vec2 PD[12]=vec2[12](vec2(-.326,-.406),vec2(-.840,-.074),vec2(-.696,.457),vec2(-.203,.621),vec2(.962,-.195),vec2(.473,-.480),vec2(.519,.767),vec2(.185,-.893),vec2(.507,.064),vec2(.896,.412),vec2(-.322,-.933),vec2(-.792,-.598));
+float ign(vec2 p){ return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715)))); }
+vec3 neutral(vec3 color){
+  const float startCompression=.8-.04, desaturation=.15;
+  float x=min(color.r,min(color.g,color.b));
+  float offset=x<.08?x-6.25*x*x:.04;
+  color-=offset;
+  float peak=max(color.r,max(color.g,color.b));
+  if(peak<startCompression) return color;
+  const float d=1.-startCompression;
+  float newPeak=1.-d*d/(peak+d-startCompression);
+  color*=newPeak/peak;
+  float g=1.-1./(desaturation*(peak-newPeak)+1.);
+  return mix(color,vec3(newPeak),g);
+}
+void main(){
+  vec2 uv=gl_FragCoord.xy/uRes; vec4 s0=texture(tComp,uv);
+  // shallow depth of field: blur grows away from the focus distance
+  float coc=clamp(abs(s0.a-uFocus)*uDofK,0.,1.)*uRes.y*.0045; vec3 c=s0.rgb;
+  if(coc>.6){
+    float a=ign(gl_FragCoord.xy)*6.2831853; mat2 rot=mat2(cos(a),-sin(a),sin(a),cos(a)); float w=1.;
+    for(int i=0;i<12;i++){ vec4 t=texture(tComp,uv+rot*PD[i]*coc/uRes); float wt=clamp(abs(t.a-uFocus)*uDofK*3.+.15,0.,1.); c+=t.rgb*wt; w+=wt; }
+    c/=w;
+  }
+  c+=texture(tBloom,uv).rgb*.3;
+  c=neutral(max(c,0.));
+  c=mix(c*12.92,1.055*pow(max(c,vec3(1e-5)),vec3(1./2.4))-.055,step(.0031308,c));
+  c+=(ign(gl_FragCoord.xy+fract(uFocus)*0.)-.5)*2.4/255.;
+  gl_FragColor=vec4(c,1.);
+}`;
+
+const VS_K = /* glsl */`
+attribute vec3 aRest; attribute vec3 aAbs; attribute vec3 aAlb; attribute vec3 aTint; attribute float aId; varying float vId;
+varying vec3 vW; varying vec3 vN; varying vec3 vQ; varying vec3 vAbs; varying vec3 vAlb; varying vec3 vTint; varying float vDepth; varying vec2 vUv;
+void main(){
+  vec4 p=vec4(position,1.);
+  #ifdef USE_INSTANCING
+  p=instanceMatrix*p;
+  #endif
+  vec4 w=modelMatrix*p; vW=w.xyz; vN=normal; vId=aId; vQ=aRest; vAbs=aAbs; vAlb=aAlb; vTint=aTint; vUv=uv;
+  vec4 mv=viewMatrix*w; vDepth=-mv.z; gl_Position=projectionMatrix*mv;
+}`;
+const FS_HEIGHT = /* glsl */`
+varying vec3 vW; varying vec3 vTint;
+void main(){ gl_FragColor=vec4(vTint,vW.y); }`;
+const FS_LEGEND = /* glsl */`
+varying float vDepth; varying vec2 vUv; varying vec3 vAlb; uniform sampler2D tAtlas; uniform float uDim;
+void main(){ float a=smoothstep(.22,.78,texture(tAtlas,vUv).r); if(a<.01) discard; gl_FragColor=vec4(mix(vAlb,vec3(1.25,1.18,1.05),uDim),a*mix(.76,.86,uDim)); }`;
+
+const FS_FLOOR = /* glsl */`
+${GL_COMMON}${POISSON}
+varying vec3 vW; varying float vDepth;
+uniform sampler2D tShadow, tHeight;
+uniform mat4 uLightVP, uHeightVP;
+uniform float uLightRange, uLightExtent, uShadowTexel, uPlate;
+varying vec3 vN;
+void main(){
+  vec4 lp=uLightVP*vec4(vW,1.); vec3 s=lp.xyz*.5+.5;
+  float a=ign(gl_FragCoord.xy)*6.2831853; mat2 rot=mat2(cos(a),-sin(a),sin(a),cos(a));
+  float shadow=0., jel=0.;
+  if(s.x>0.&&s.x<1.&&s.y>0.&&s.y<1.){
+    float bias=.004/uLightRange, db=0., nb=0., kind=0.;
+    float searchR=.16/uLightExtent;
+    for(int i=0;i<16;i++){ vec2 t=texture(tShadow,s.xy+rot*PD[i]*searchR).rg; if(t.r<s.z-bias){ db+=t.r; kind+=t.g; nb+=1.; } }
+    if(nb>0.){
+      db/=nb; jel=kind/nb;
+      float pen=clamp((s.z-db)*uLightRange*.1/uLightExtent,1.4*uShadowTexel,.02);
+      for(int i=0;i<16;i++){ shadow+=step(texture(tShadow,s.xy+rot*PD[i]*pen).r,s.z-bias); }
+      shadow/=16.;
+    }
+  }
+  // contact occlusion + the colour of whatever jelly stands over this patch of table
+  vec4 hp=uHeightVP*vec4(vW,1.); vec2 huv=hp.xy*.5+.5; float occ=0., tw=0.; vec3 tint=vec3(0.);
+  for(int i=0;i<12;i++){
+    vec2 o=rot*PD[i]; vec4 hh=texture(tHeight,huv+o*.5/uLightExtent);
+    float pres=1.-smoothstep(0.,.6,hh.a);
+    occ+=pres*(1.-.6*length(o)); tint+=hh.rgb*pres; tw+=pres;
+  }
+  occ/=12.*.62;
+  tint=tw>0.?tint/tw:vec3(1.,.8,.5);
+  float ao=1.-.36*clamp(occ,0.,1.);
+  vec3 sh=mix(vec3(.50,.49,.53),tint,jel*.9);
+  vec3 base=uSweep*mix(vec3(1.),vec3(.9,.905,.92),uPlate);
+  vec3 col=base*mix(vec3(1.),sh,shadow)*ao;
+  // light focused by the jelly: bright, coloured patches inside its shadow
+  float cn=vnoise(vec3(vW.xz*5.5,1.))*.6+vnoise(vec3(vW.xz*13.,7.))*.4;
+  float ca=smoothstep(.5,.82,cn)*jel*smoothstep(.35,.95,shadow);
+  col+=tint*(.34*ca+.05*jel*shadow);
+  if(uPlate>.5){
+    vec3 N=normalize(vN), V=normalize(cameraPosition-vW);
+    float F=.045+.955*pow(1.-max(dot(N,V),0.),5.);
+    col=col*(1.-F)+studio(reflect(-V,N),.22)*F*(1.-.6*shadow);
+  }
+  gl_FragColor=vec4(col,vDepth);
+}`;
+
+const FS_JELLY = /* glsl */`
+${GL_COMMON}${POISSON}
+varying vec3 vW; varying vec3 vN; varying vec3 vQ; varying vec3 vAbs; varying vec3 vAlb; varying float vDepth; varying float vId;
+uniform sampler2D tScene, tBack, tShadow, tJellyA;
+uniform vec2 uRes; uniform float uProj;
+uniform mat4 uLightVP, uVP; uniform float uLightRange;
+uniform vec3 uKeyDir, uKeyCol;
+struct Mat { vec3 sa; float ss; };
+
+// juice vesicles: small teardrop sacs standing upright in the jelly
+Mat material(vec3 q){
+  vec3 c=q*vec3(15.,7.5,15.); c.y+=.5*sin(floor(c.x)*12.7+floor(c.z)*4.1);
+  vec3 b=floor(c-.5); float f1=9.,f2=9.,idr=0.;
+  for(int dx=0;dx<2;dx++) for(int dy=0;dy<2;dy++) for(int dz=0;dz<2;dz++){
+    vec3 cell=b+vec3(float(dx),float(dy),float(dz));
+    vec3 h=hash33(cell);
+    vec3 dv=(c-(cell+.5+(h-.5)*.7))*vec3(1.,.62,1.);
+    float d=dot(dv,dv);
+    if(d<f1){ f2=f1; f1=d; idr=h.x; } else if(d<f2) f2=d;
+  }
+  float edge=1.-smoothstep(0.,.3,sqrt(f2)-sqrt(f1));
+  return Mat(vAbs*1.45*mix(.82,1.2,idr), .22+1.5*edge);
+}
+float lightThick(vec3 p){
+  vec4 lp=uLightVP*vec4(p,1.); vec3 s=lp.xyz*.5+.5;
+  return max(0.,s.z-texture(tShadow,s.xy).r)*uLightRange;
+}
+float ggx(float nh,float a){ float a2=a*a; float d=nh*nh*(a2-1.)+1.; return a2/(PI*d*d); }
+
+void main(){
+  vec3 N=normalize(vN), V=normalize(cameraPosition-vW);
+  vec2 uv=gl_FragCoord.xy/uRes;
+  vec3 q=vQ;
+  vec3 bump=vec3(vnoise(q*55.),vnoise(q*55.+17.),vnoise(q*55.+31.))-.5;
+  N=normalize(N+bump*.05);
+  float nv=max(dot(N,V),0.);
+  float zb=texture(tBack,uv).r;
+  float tv=max(zb-vDepth,0.)*length(cameraPosition-vW)/max(vDepth,1e-3);
+  vec3 rd=refract(-V,N,1./1.42);
+  float cosT=max(-dot(rd,N),.25);
+  float tr=clamp(tv*nv/cosT+.02,.03,2.2);
+
+  const int STEPS=5;
+  float dt=tr/float(STEPS), j=.42+.16*ign(gl_FragCoord.xy);
+  vec3 T=vec3(1.), acc=vec3(0.), ext=vec3(0.); float ssum=0.;
+  vec3 amb=uSweep*.5+vec3(.04);
+  for(int i=0;i<STEPS;i++){
+    float t=(float(i)+j)*dt;
+    Mat m=material(q+rd*t);
+    float lt=lightThick(vW+rd*t);
+    vec3 sig=m.sa+vec3(m.ss);
+    vec3 Lin=uKeyCol*exp(-(m.sa*1.1+vec3(m.ss*.07))*min(lt,3.))+amb*exp(-m.sa*.22);
+    vec3 stepT=exp(-sig*dt);
+    acc+=T*(1.-stepT)*(m.ss/sig)*vAlb*Lin;
+    T*=stepT; ext+=sig*dt; ssum+=m.ss*dt;
+  }
+  vec3 sigBar=ext/tr;
+  vec3 X=vW+rd*tr;
+  vec4 cp=uVP*vec4(X,1.); vec2 uvx=cp.xy/cp.w*.5+.5;
+  float blurW=clamp(.0025+.009*ssum,.002,.03);
+  float rad=blurW*uProj/(2.*max(vDepth,.5));
+  float a=ign(gl_FragCoord.xy+17.)*6.2831853; mat2 rot=mat2(cos(a),-sin(a),sin(a),cos(a));
+  vec3 bg=vec3(0.); float tz=max(zb-vDepth,1e-3);
+  for(int i=0;i<8;i++){
+    vec2 o=rot*PD[i]*rad; o.x*=uRes.y/uRes.x;
+    vec2 u=clamp(uvx+o,vec2(.002),vec2(.998));
+    vec4 sc=texture(tScene,u);
+    vec3 c=sc.a<vDepth-.03?uSweep*.8:sc.rgb;
+    #ifndef PASS_A
+    vec4 ja=texture(tJellyA,u); float oid=ja.a*64.;
+    if(oid>.5&&abs(oid-vId)>.5) c=ja.rgb;       // another key seen through this one
+    #endif
+    float len=tr*clamp((texture(tBack,u).r-vDepth)/tz,.3,1.6);
+    bg+=c*exp(-sigBar*len);
+  }
+  bg/=8.;
+  vec3 inside=acc+bg+vAlb*uKeyCol*.1*exp(-tr*2.2);
+
+  float F=.03+.97*pow(1.-nv,5.);
+  vec3 refl=studio(reflect(-V,N),.035);
+  vec3 Hh=normalize(V+uKeyDir);
+  float spec=ggx(max(dot(N,Hh),0.),.015)*max(dot(N,uKeyDir),0.)*.03;
+  vec3 gc=floor(q*90.); vec3 gh=hash33(gc); float glint=0.;
+  if(gh.x>.955){
+    vec3 gn=normalize(N+(hash33(gc+19.)-.5)*1.3);
+    glint=pow(max(dot(gn,Hh),0.),420.)*5.+pow(max(dot(gn,normalize(V+normalize(vec3(.3,.5,-.8)))),0.),420.)*3.;
+  }
+  vec3 outc=inside*(1.-F)+refl*F+uKeyCol*(spec+glint);
+  #ifdef PASS_A
+  gl_FragColor=vec4(outc,vId/64.);
+  #else
+  gl_FragColor=vec4(outc,1.);
+  #endif
+}`;
+
+const FS_BUBBLE = /* glsl */`
+${GL_COMMON}
+varying vec3 vW; varying vec3 vN; varying float vDepth;
+void main(){
+  vec3 N=normalize(vN), V=normalize(cameraPosition-vW);
+  float f=pow(1.-max(dot(N,V),0.),2.);
+  vec3 col=mix(uSweep*.55,vec3(2.4,2.3,2.2),f)+studio(reflect(-V,N),.1)*.2;
+  gl_FragColor=vec4(col,vDepth);
+}`;
+const FS_COMP = /* glsl */`
+uniform sampler2D tScene, tJelly; uniform vec2 uRes;
+void main(){ vec2 uv=gl_FragCoord.xy/uRes; vec4 s=texture(tScene,uv); vec4 jl=texture(tJelly,uv); gl_FragColor=vec4(s.rgb*(1.-jl.a)+jl.rgb,s.a); }`;
+const FS_BRIGHT = /* glsl */`
+uniform sampler2D tComp; uniform vec2 uBRes;
+void main(){
+  vec2 uv=gl_FragCoord.xy/uBRes, px=.5/uBRes; vec3 c=vec3(0.);
+  c+=texture(tComp,uv+px*vec2(-1.,-1.)).rgb+texture(tComp,uv+px*vec2(1.,-1.)).rgb+texture(tComp,uv+px*vec2(-1.,1.)).rgb+texture(tComp,uv+px*vec2(1.,1.)).rgb;
+  c*=.25; float l=max(c.r,max(c.g,c.b));
+  gl_FragColor=vec4(min(c*smoothstep(1.7,3.4,l),vec3(6.)),1.);
+}`;
+const FS_BLUR = /* glsl */`
+uniform sampler2D tSrc; uniform vec2 uBRes, uDir;
+void main(){
+  vec2 uv=gl_FragCoord.xy/uBRes, d=uDir/uBRes; vec3 c=texture(tSrc,uv).rgb*.227;
+  c+=(texture(tSrc,uv+d*1.38).rgb+texture(tSrc,uv-d*1.38).rgb)*.316;
+  c+=(texture(tSrc,uv+d*3.23).rgb+texture(tSrc,uv-d*3.23).rgb)*.0703;
+  gl_FragColor=vec4(c,1.);
+}`;
+
+// per-tet co-rotational shape matching + volume + strain limits (XPBD)
+function solvePiece(P, W) {
+  const x = P.x, tets = P.tets, tq = P.tq, tm = P.tm, tR = P.tR, im = P.im, nt = P.nt;
+  const kHard = 1 / (1 + W.alphaShape), kSoft = 1 / (1 + W.alphaShape * W.softMul), kVol = W.kVol;
+  for (let t = 0; t < nt; t++) {
+    const t4 = t * 4, t12 = t * 12;
+    const i0 = tets[t4] * 3, i1 = tets[t4 + 1] * 3, i2 = tets[t4 + 2] * 3, i3 = tets[t4 + 3] * 3;
+    const m0 = tm[t4], m1 = tm[t4 + 1], m2 = tm[t4 + 2], m3 = tm[t4 + 3];
+    const cx = m0 * x[i0] + m1 * x[i1] + m2 * x[i2] + m3 * x[i3];
+    const cy = m0 * x[i0 + 1] + m1 * x[i1 + 1] + m2 * x[i2 + 1] + m3 * x[i3 + 1];
+    const cz = m0 * x[i0 + 2] + m1 * x[i1 + 2] + m2 * x[i2 + 2] + m3 * x[i3 + 2];
+    let a00 = 0, a01 = 0, a02 = 0, a10 = 0, a11 = 0, a12 = 0, a20 = 0, a21 = 0, a22 = 0;
+    {
+      let px = m0 * (x[i0] - cx), py = m0 * (x[i0 + 1] - cy), pz = m0 * (x[i0 + 2] - cz), qx = tq[t12], qy = tq[t12 + 1], qz = tq[t12 + 2];
+      a00 += px * qx; a01 += px * qy; a02 += px * qz; a10 += py * qx; a11 += py * qy; a12 += py * qz; a20 += pz * qx; a21 += pz * qy; a22 += pz * qz;
+      px = m1 * (x[i1] - cx); py = m1 * (x[i1 + 1] - cy); pz = m1 * (x[i1 + 2] - cz); qx = tq[t12 + 3]; qy = tq[t12 + 4]; qz = tq[t12 + 5];
+      a00 += px * qx; a01 += px * qy; a02 += px * qz; a10 += py * qx; a11 += py * qy; a12 += py * qz; a20 += pz * qx; a21 += pz * qy; a22 += pz * qz;
+      px = m2 * (x[i2] - cx); py = m2 * (x[i2 + 1] - cy); pz = m2 * (x[i2 + 2] - cz); qx = tq[t12 + 6]; qy = tq[t12 + 7]; qz = tq[t12 + 8];
+      a00 += px * qx; a01 += px * qy; a02 += px * qz; a10 += py * qx; a11 += py * qy; a12 += py * qz; a20 += pz * qx; a21 += pz * qy; a22 += pz * qz;
+      px = m3 * (x[i3] - cx); py = m3 * (x[i3 + 1] - cy); pz = m3 * (x[i3 + 2] - cz); qx = tq[t12 + 9]; qy = tq[t12 + 10]; qz = tq[t12 + 11];
+      a00 += px * qx; a01 += px * qy; a02 += px * qz; a10 += py * qx; a11 += py * qy; a12 += py * qz; a20 += pz * qx; a21 += pz * qy; a22 += pz * qz;
+    }
+    // warm-started rotation extraction (Müller et al. 2016)
+    let qx = tR[t4], qy = tR[t4 + 1], qz = tR[t4 + 2], qw = tR[t4 + 3];
+    let r00, r01, r02, r10, r11, r12, r20, r21, r22;
+    for (let it = 0; it < 3; it++) {
+      r00 = 1 - 2 * (qy * qy + qz * qz); r01 = 2 * (qx * qy - qw * qz); r02 = 2 * (qx * qz + qw * qy);
+      r10 = 2 * (qx * qy + qw * qz); r11 = 1 - 2 * (qx * qx + qz * qz); r12 = 2 * (qy * qz - qw * qx);
+      r20 = 2 * (qx * qz - qw * qy); r21 = 2 * (qy * qz + qw * qx); r22 = 1 - 2 * (qx * qx + qy * qy);
+      if (it === 2) break;
+      const den = Math.abs(r00 * a00 + r10 * a10 + r20 * a20 + r01 * a01 + r11 * a11 + r21 * a21 + r02 * a02 + r12 * a12 + r22 * a22) + 1e-12;
+      const ox = ((r10 * a20 - r20 * a10) + (r11 * a21 - r21 * a11) + (r12 * a22 - r22 * a12)) / den;
+      const oy = ((r20 * a00 - r00 * a20) + (r21 * a01 - r01 * a21) + (r22 * a02 - r02 * a22)) / den;
+      const oz = ((r00 * a10 - r10 * a00) + (r01 * a11 - r11 * a01) + (r02 * a12 - r12 * a02)) / den;
+      const w = Math.sqrt(ox * ox + oy * oy + oz * oz);
+      if (w < 1e-9) continue;
+      const hw = 0.5 * w, s = Math.sin(hw) / w, c = Math.cos(hw);
+      const dx = ox * s, dy = oy * s, dz = oz * s;
+      const nx = c * qx + dx * qw + dy * qz - dz * qy, ny = c * qy + dy * qw + dz * qx - dx * qz, nz = c * qz + dz * qw + dx * qy - dy * qx, nw = c * qw - dx * qx - dy * qy - dz * qz;
+      const il = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz + nw * nw);
+      qx = nx * il; qy = ny * il; qz = nz * il; qw = nw * il;
+    }
+    tR[t4] = qx; tR[t4 + 1] = qy; tR[t4 + 2] = qz; tR[t4 + 3] = qw;
+    const k = P.tSoft[t] ? kSoft : kHard;
+    for (let s = 0; s < 4; s++) {
+      const i = tets[t4 + s] * 3, ax = tq[t12 + s * 3], ay = tq[t12 + s * 3 + 1], az = tq[t12 + s * 3 + 2];
+      x[i] += k * (cx + r00 * ax + r01 * ay + r02 * az - x[i]);
+      x[i + 1] += k * (cy + r10 * ax + r11 * ay + r12 * az - x[i + 1]);
+      x[i + 2] += k * (cz + r20 * ax + r21 * ay + r22 * az - x[i + 2]);
+    }
+    // volume
+    const e1x = x[i1] - x[i0], e1y = x[i1 + 1] - x[i0 + 1], e1z = x[i1 + 2] - x[i0 + 2];
+    const e2x = x[i2] - x[i0], e2y = x[i2 + 1] - x[i0 + 1], e2z = x[i2 + 2] - x[i0 + 2];
+    const e3x = x[i3] - x[i0], e3y = x[i3 + 1] - x[i0 + 1], e3z = x[i3 + 2] - x[i0 + 2];
+    const g1x = (e2y * e3z - e2z * e3y) / 6, g1y = (e2z * e3x - e2x * e3z) / 6, g1z = (e2x * e3y - e2y * e3x) / 6;
+    const g2x = (e3y * e1z - e3z * e1y) / 6, g2y = (e3z * e1x - e3x * e1z) / 6, g2z = (e3x * e1y - e3y * e1x) / 6;
+    const g3x = (e1y * e2z - e1z * e2y) / 6, g3y = (e1z * e2x - e1x * e2z) / 6, g3z = (e1x * e2y - e1y * e2x) / 6;
+    const g0x = -(g1x + g2x + g3x), g0y = -(g1y + g2y + g3y), g0z = -(g1z + g2z + g3z);
+    const C = e1x * g1x + e1y * g1y + e1z * g1z - P.tV0[t];
+    const w0 = im[tets[t4]], w1 = im[tets[t4 + 1]], w2 = im[tets[t4 + 2]], w3 = im[tets[t4 + 3]];
+    const den = w0 * (g0x * g0x + g0y * g0y + g0z * g0z) + w1 * (g1x * g1x + g1y * g1y + g1z * g1z) + w2 * (g2x * g2x + g2y * g2y + g2z * g2z) + w3 * (g3x * g3x + g3y * g3y + g3z * g3z);
+    if (den > 1e-14) {
+      const l = -kVol * C / den;
+      x[i0] += l * w0 * g0x; x[i0 + 1] += l * w0 * g0y; x[i0 + 2] += l * w0 * g0z;
+      x[i1] += l * w1 * g1x; x[i1 + 1] += l * w1 * g1y; x[i1 + 2] += l * w1 * g1z;
+      x[i2] += l * w2 * g2x; x[i2 + 1] += l * w2 * g2y; x[i2 + 2] += l * w2 * g2z;
+      x[i3] += l * w3 * g3x; x[i3 + 1] += l * w3 * g3y; x[i3 + 2] += l * w3 * g3z;
+    }
+  }
+  // hard strain limits
+  const E = P.edges, eL = P.eL;
+  for (let e = 0; e < P.ne; e++) {
+    const a = E[e * 2], b = E[e * 2 + 1], i = a * 3, j = b * 3;
+    const dx = x[j] - x[i], dy = x[j + 1] - x[i + 1], dz = x[j + 2] - x[i + 2], l = Math.sqrt(dx * dx + dy * dy + dz * dz), L = eL[e];
+    let tgt;
+    if (l > 1.8 * L) tgt = 1.8 * L; else if (l < 0.35 * L) tgt = 0.35 * L; else continue;
+    if (l < 1e-9) continue;
+    const wa = im[a], wb = im[b]; if (wa + wb === 0) continue; const s = (l - tgt) / (l * (wa + wb));
+    x[i] += dx * s * wa; x[i + 1] += dy * s * wa; x[i + 2] += dz * s * wa;
+    x[j] -= dx * s * wb; x[j + 1] -= dy * s * wb; x[j + 2] -= dz * s * wb;
+  }
+}
+
+
+// ───────────────────────── keyboard: layout, lattices, skins, physics step ─────────────────────────
+const KH = 0.5, KS = 0.86, KR = 0.15, CELL = 0.2, LEG_Y = KH + 0.006;
+const SUBSTEPS = 10, HS = 1 / 600, GRAV = 0, VMAX = 22, FR = 0.4, PRESS = 0.3;
+const FLAVORS = [
+  { name: 'orange', abs: [0.09, 0.95, 4.4], alb: [1.0, 0.72, 0.25] },
+  { name: 'lemon', abs: [0.04, 0.2, 2.5], alb: [1.0, 0.94, 0.42] },
+  { name: 'blood orange', abs: [0.28, 2.7, 4.4], alb: [1.0, 0.42, 0.24] },
+  { name: 'lime', abs: [1.25, 0.1, 3.1], alb: [0.72, 1.0, 0.36] },
+  { name: 'grapefruit', abs: [0.08, 1.35, 1.75], alb: [1.0, 0.62, 0.5] },
+];
+const world = { keys: [], fingers: new Map(), alphaShape: 60, softMul: 1, kVol: 0.55, damp: 0.004, time: 0, np: 0, nt: 0 };
+
+// keycap profile: wider at the base, narrower on top, with a shallow dish for the fingertip
+function capScale(y) { return 1.07 - 0.17 * Math.max(0, Math.min(1, y / KH)); }
+function capDish(K, lx, lz, y) {
+  const t = Math.max(0, Math.min(1, (y / KH - 0.72) / 0.28)), s = t * t * (3 - 2 * t);
+  return 0.05 * s * Math.max(0, 1 - Math.pow(lx / (K.w * 0.42), 2) - Math.pow(lz / (K.d * 0.42), 2));
+}
+function layoutKeys(padBelow) {
+  const out = [], add = (label, ch, code, x, row, w) => out.push({ label, ch, code, cx: x - 4.5, cz: row - 1.5, w: w || KS, d: KS, row });
+  'QWERTYUIOP'.split('').forEach((c, i) => add(c, c.toLowerCase(), 'Key' + c, i, 0));
+  'ASDFGHJKL'.split('').forEach((c, i) => add(c, c.toLowerCase(), 'Key' + c, i + 0.5, 1));
+  'ZXCVBNM'.split('').forEach((c, i) => add(c, c.toLowerCase(), 'Key' + c, i + 1, 2));
+  add('⌫', '\b', 'Backspace', 8.5, 2, 1.86);
+  add('.', '.', 'Period', 0.5, 3);
+  add('', ' ', 'Space', 4.25, 3, 6.36);
+  add('↵', '\n', 'Enter', 8.5, 3, 1.86);
+  // number pad: beside the letters on wide screens, underneath them on phones
+  const px = padBelow ? 3.5 : 10.6, pr = padBelow ? 4.6 : 0;
+  [[7, 8, 9], [4, 5, 6], [1, 2, 3]].forEach((r, j) => r.forEach((n, i) => { add('' + n, '' + n, 'Numpad' + n, px + i, pr + j); out[out.length - 1].alt = 'Digit' + n; }));
+  add('0', '0', 'Numpad0', px + 0.5, pr + 3, 1.86); out[out.length - 1].alt = 'Digit0';
+  add('.', '.', 'NumpadDecimal', px + 2, pr + 3);
+  const xs = out.map(k => [k.cx - k.w / 2, k.cx + k.w / 2]).flat(), zs = out.map(k => [k.cz - k.d / 2, k.cz + k.d / 2]).flat();
+  const ox = (Math.min(...xs) + Math.max(...xs)) / 2, oz = (Math.min(...zs) + Math.max(...zs)) / 2;
+  out.forEach((k, i) => { k.cx -= ox; k.cz -= oz; k.flavor = FLAVORS[(Math.round(k.cx + 20) + Math.round(k.row) * 2) % 5]; k.index = i; });
+  world.hx = (Math.max(...xs) - Math.min(...xs)) / 2; world.hz = (Math.max(...zs) - Math.min(...zs)) / 2;
+  return out;
+}
+function tetVol(r, i0, i1, i2, i3) {
+  const ax = r[i0 * 3], ay = r[i0 * 3 + 1], az = r[i0 * 3 + 2];
+  const e1x = r[i1 * 3] - ax, e1y = r[i1 * 3 + 1] - ay, e1z = r[i1 * 3 + 2] - az;
+  const e2x = r[i2 * 3] - ax, e2y = r[i2 * 3 + 1] - ay, e2z = r[i2 * 3 + 2] - az;
+  const e3x = r[i3 * 3] - ax, e3y = r[i3 * 3 + 1] - ay, e3z = r[i3 * 3 + 2] - az;
+  return (e1x * (e2y * e3z - e2z * e3y) + e1y * (e2z * e3x - e2x * e3z) + e1z * (e2x * e3y - e2y * e3x)) / 6;
+}
+// one key = a small lattice of particles split into tetrahedra, bottom layer stuck to the table
+function buildLattice(K) {
+  const nx = Math.max(4, Math.round(K.w / CELL) + 1), ny = 4, nz = 5, n = nx * ny * nz;
+  const id = (i, j, k) => (j * nz + k) * nx + i;
+  K.nx = nx; K.ny = ny; K.nz = nz; K.n = n;
+  K.rest = new Float64Array(n * 3); K.x = new Float64Array(n * 3); K.p = new Float64Array(n * 3); K.v = new Float64Array(n * 3);
+  K.m = new Float64Array(n); K.im = new Float64Array(n);
+  for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
+    const o = id(i, j, k) * 3;
+    K.rest[o] = K.cx - K.w / 2 + K.w * i / (nx - 1); K.rest[o + 1] = KH * j / (ny - 1); K.rest[o + 2] = K.cz - K.d / 2 + K.d * k / (nz - 1);
+  }
+  K.x.set(K.rest); K.p.set(K.rest);
+  const tets = [], perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+  for (let j = 0; j < ny - 1; j++) for (let k = 0; k < nz - 1; k++) for (let i = 0; i < nx - 1; i++) for (const pm of perms) {
+    const c = [i, j, k], q = [id(i, j, k)];
+    for (const a of pm) { c[a]++; q.push(id(c[0], c[1], c[2])); }
+    if (tetVol(K.rest, q[0], q[1], q[2], q[3]) < 0) { const s = q[2]; q[2] = q[3]; q[3] = s; }
+    tets.push(...q);
+  }
+  const nt = tets.length / 4; K.nt = nt; K.tets = Int32Array.from(tets);
+  K.tq = new Float64Array(nt * 12); K.tm = new Float64Array(nt * 4); K.tR = new Float64Array(nt * 4); K.tV0 = new Float64Array(nt); K.tSoft = new Uint8Array(nt);
+  for (let t = 0; t < nt; t++) { K.tV0[t] = tetVol(K.rest, tets[t * 4], tets[t * 4 + 1], tets[t * 4 + 2], tets[t * 4 + 3]); for (let s = 0; s < 4; s++) K.m[tets[t * 4 + s]] += K.tV0[t] / 4; }
+  K.mass = 0; K.vol0 = 0;
+  for (let i = 0; i < n; i++) { K.im[i] = i < nx * nz ? 0 : 1 / K.m[i]; K.mass += K.m[i]; }
+  const r = K.rest;
+  for (let t = 0; t < nt; t++) {
+    let ms = 0, cx = 0, cy = 0, cz = 0; K.vol0 += K.tV0[t];
+    for (let s = 0; s < 4; s++) { const i = tets[t * 4 + s], w = K.m[i]; ms += w; cx += w * r[i * 3]; cy += w * r[i * 3 + 1]; cz += w * r[i * 3 + 2]; }
+    cx /= ms; cy /= ms; cz /= ms;
+    for (let s = 0; s < 4; s++) { const i = tets[t * 4 + s]; K.tm[t * 4 + s] = K.m[i] / ms; K.tq[t * 12 + s * 3] = r[i * 3] - cx; K.tq[t * 12 + s * 3 + 1] = r[i * 3 + 1] - cy; K.tq[t * 12 + s * 3 + 2] = r[i * 3 + 2] - cz; }
+    K.tR[t * 4 + 3] = 1;
+  }
+  const es = new Set(), ea = [];
+  for (let t = 0; t < nt; t++) for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) {
+    const i = tets[t * 4 + a], j = tets[t * 4 + b], k = i < j ? i * 65536 + j : j * 65536 + i;
+    if (!es.has(k)) { es.add(k); ea.push(i, j); }
+  }
+  K.edges = Int32Array.from(ea); K.ne = ea.length / 2; K.eL = new Float64Array(K.ne);
+  for (let e = 0; e < K.ne; e++) { const i = ea[e * 2] * 3, j = ea[e * 2 + 1] * 3; K.eL[e] = Math.hypot(r[i] - r[j], r[i + 1] - r[j + 1], r[i + 2] - r[j + 2]); }
+  K.awake = 0; K.down = false; K.depress = 0; K.dirty = true;
+}
+// trilinear embedding of a rest point in the key's lattice: 8 particle ids + weights
+function embed(K, x, y, z, ei, ew, o) {
+  const fx = (x - (K.cx - K.w / 2)) / K.w * (K.nx - 1), fy = y / KH * (K.ny - 1), fz = (z - (K.cz - K.d / 2)) / K.d * (K.nz - 1);
+  const i = Math.max(0, Math.min(K.nx - 2, Math.floor(fx))), j = Math.max(0, Math.min(K.ny - 2, Math.floor(fy))), k = Math.max(0, Math.min(K.nz - 2, Math.floor(fz)));
+  const u = fx - i, v = fy - j, w = fz - k; let s = 0;
+  for (let dj = 0; dj < 2; dj++) for (let dk = 0; dk < 2; dk++) for (let di = 0; di < 2; di++) {
+    ei[o * 8 + s] = ((j + dj) * K.nz + (k + dk)) * K.nx + i + di;
+    ew[o * 8 + s] = (di ? u : 1 - u) * (dj ? v : 1 - v) * (dk ? w : 1 - w); s++;
+  }
+}
+// rounded-box skin for every key, merged into one geometry; plus the legend sheets inside
+function buildSkins(keys) {
+  const pos = [], abs = [], alb = [], tint = [], ids = [], idx = [], lpos = [], luv = [], lidx = [], lcol = [], bub = [];
+  let seed = 99; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (const K of keys) {
+    const v0 = pos.length / 3, i0 = idx.length, map = new Map(), he = [K.w / 2, KH / 2, K.d / 2], loc = [];
+    const seg = he.map(h => Math.max(4, Math.ceil(2 * h / 0.1)));
+    const vert = (p) => {
+      const key = Math.round(p[0] * 1e4) + ',' + Math.round(p[1] * 1e4) + ',' + Math.round(p[2] * 1e4);
+      let id = map.get(key); if (id !== undefined) return id;
+      const c = p.map((val, a) => Math.max(-(he[a] - KR), Math.min(he[a] - KR, val)));
+      const dx = p[0] - c[0], dy = p[1] - c[1], dz = p[2] - c[2], l = Math.hypot(dx, dy, dz) || 1;
+      id = loc.length / 3; loc.push(c[0] + dx / l * KR, c[1] + dy / l * KR, c[2] + dz / l * KR); map.set(key, id); return id;
+    };
+    for (let a = 0; a < 3; a++) for (const sgn of [-1, 1]) {
+      const b = (a + 1) % 3, c = (a + 2) % 3, nb = seg[b], nc = seg[c];
+      for (let i = 0; i < nb; i++) for (let j = 0; j < nc; j++) {
+        const q = [[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]].map(([s, t]) => { const p = [0, 0, 0]; p[a] = sgn * he[a]; p[b] = -he[b] + 2 * he[b] * s / nb; p[c] = -he[c] + 2 * he[c] * t / nc; return vert(p); });
+        if (sgn > 0) idx.push(v0 + q[0], v0 + q[1], v0 + q[2], v0 + q[0], v0 + q[2], v0 + q[3]); else idx.push(v0 + q[0], v0 + q[2], v0 + q[1], v0 + q[0], v0 + q[3], v0 + q[2]);
+      }
+    }
+    const nv = loc.length / 3; K.v0 = v0; K.nv = nv; K.i0 = i0; K.ni = idx.length - i0;
+    K.ei = new Int32Array(nv * 8); K.ew = new Float32Array(nv * 8);
+    const f = K.flavor, tn = f.abs.map(a => Math.exp(-a * 0.42));
+    for (let i = 0; i < nv; i++) {
+      const y0 = KH / 2 + loc[i * 3 + 1], sc = capScale(y0), lx = loc[i * 3] * sc, lz = loc[i * 3 + 2] * sc;
+      const x = K.cx + lx, y = y0 - capDish(K, lx, lz, y0), z = K.cz + lz;
+      pos.push(x, y, z); ids.push(K.index + 1); abs.push(...f.abs); alb.push(...f.alb); tint.push(...tn); embed(K, x, y, z, K.ei, K.ew, i);
+    }
+    // legend sheet
+    K.l0 = lpos.length / 3; K.ln = 0;
+    if (K.label) {
+      const g = 0.42, N = 6, b = K.l0; K.ln = (N + 1) * (N + 1); K.lei = new Int32Array(K.ln * 8); K.lew = new Float32Array(K.ln * 8);
+      const col = K.index % 8, rowA = Math.floor(K.index / 8);
+      for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+        const x = K.cx - g / 2 + g * i / N, z = K.cz - g / 2 + g * j / N, ly = LEG_Y - capDish(K, x - K.cx, z - K.cz, KH);
+        lpos.push(x, ly, z); lcol.push(...K.flavor.abs.map(q => 0.015 + 0.3 * Math.exp(-q * 1.5))); luv.push((col + i / N) / 8, 1 - (rowA + j / N) / 8); embed(K, x, ly, z, K.lei, K.lew, j * (N + 1) + i);
+      }
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const a = b + j * (N + 1) + i, c = a + N + 1; lidx.push(a, c, a + 1, a + 1, c, c + 1); }
+    }
+  }
+  // a few air bubbles caught inside every key
+  for (const K of keys) {
+    const nb = Math.round(5 * Math.sqrt(K.w / KS)) + (K.index % 3); K.b0 = bub.length / 4; K.bn = nb; K.bei = new Int32Array(nb * 8); K.bew = new Float32Array(nb * 8);
+    for (let i = 0; i < nb; i++) { const x = K.cx + (rnd() - 0.5) * (K.w - 0.3), y = 0.08 + rnd() * 0.3, z = K.cz + (rnd() - 0.5) * (K.d - 0.3); bub.push(x, y, z, 0.012 + 0.022 * rnd() * rnd()); embed(K, x, y, z, K.bei, K.bew, i); }
+  }
+  return { ids: new Float32Array(ids), bub: new Float32Array(bub), bpos: new Float32Array(bub.length / 4 * 3), pos: new Float32Array(pos), rest: new Float32Array(pos), nrm: new Float32Array(pos.length), abs: new Float32Array(abs), alb: new Float32Array(alb), tint: new Float32Array(tint), index: new Uint32Array(idx), lpos: new Float32Array(lpos), lcol: new Float32Array(lcol), luv: new Float32Array(luv), lindex: new Uint32Array(lidx) };
+}
+function skin8(K, ei, ew, n, out, o0) {
+  const x = K.x;
+  for (let i = 0; i < n; i++) {
+    let sx = 0, sy = 0, sz = 0;
+    for (let s = 0; s < 8; s++) { const a = ei[i * 8 + s] * 3, w = ew[i * 8 + s]; sx += w * x[a]; sy += w * x[a + 1]; sz += w * x[a + 2]; }
+    const o = (o0 + i) * 3; out[o] = sx; out[o + 1] = sy; out[o + 2] = sz;
+  }
+}
+function skinKey(K, S) {
+  skin8(K, K.ei, K.ew, K.nv, S.pos, K.v0);
+  const pos = S.pos, nrm = S.nrm, ix = S.index;
+  nrm.fill(0, K.v0 * 3, (K.v0 + K.nv) * 3);
+  for (let t = K.i0; t < K.i0 + K.ni; t += 3) {
+    const a = ix[t] * 3, b = ix[t + 1] * 3, c = ix[t + 2] * 3;
+    const e1x = pos[b] - pos[a], e1y = pos[b + 1] - pos[a + 1], e1z = pos[b + 2] - pos[a + 2], e2x = pos[c] - pos[a], e2y = pos[c + 1] - pos[a + 1], e2z = pos[c + 2] - pos[a + 2];
+    const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+    nrm[a] += nx; nrm[a + 1] += ny; nrm[a + 2] += nz; nrm[b] += nx; nrm[b + 1] += ny; nrm[b + 2] += nz; nrm[c] += nx; nrm[c + 1] += ny; nrm[c + 2] += nz;
+  }
+  for (let i = K.v0 * 3; i < (K.v0 + K.nv) * 3; i += 3) { const l = Math.hypot(nrm[i], nrm[i + 1], nrm[i + 2]) || 1; nrm[i] /= l; nrm[i + 1] /= l; nrm[i + 2] /= l; }
+  if (K.ln) skin8(K, K.lei, K.lew, K.ln, S.lpos, K.l0);
+  skin8(K, K.bei, K.bew, K.bn, S.bpos, K.b0);
+}
+
+function substep(W) {
+  const h = HS, ih = 1 / h, drag = Math.exp(-0.1 * h), cd = W.damp, pinned = 0;
+  for (const K of W.keys) {
+    if (K.awake <= 0) continue;
+    const x = K.x, p = K.p, v = K.v, im = K.im, n3 = K.n * 3, np3 = K.nx * K.nz * 3;
+    for (let i = np3; i < n3; i += 3) {
+      v[i + 1] -= GRAV * h; v[i] *= drag; v[i + 1] *= drag; v[i + 2] *= drag;
+      p[i] = x[i]; p[i + 1] = x[i + 1]; p[i + 2] = x[i + 2];
+      x[i] += v[i] * h; x[i + 1] += v[i + 1] * h; x[i + 2] += v[i + 2] * h;
+    }
+    solvePiece(K, W);
+    for (let i = 0; i < np3; i++) x[i] = K.rest[i];          // the base stays stuck to the table
+    // fingertips: soft spheres that push the jelly out of the way
+    for (const F of W.fingers.values()) {
+      if (Math.abs(F.x - K.cx) > K.w / 2 + FR + 0.1 || Math.abs(F.z - K.cz) > K.d / 2 + FR + 0.1) continue;
+      const fy = KH + FR - 0.04 - F.depth;
+      for (let i = np3; i < n3; i += 3) {
+        const dx = x[i] - F.x, dy = x[i + 1] - fy, dz = x[i + 2] - F.z, d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < FR * FR && d2 > 1e-10) { const d = Math.sqrt(d2), s = (FR - d) / d * 0.85; x[i] += dx * s * 0.35; x[i + 1] += dy * s; x[i + 2] += dz * s * 0.35; }
+      }
+    }
+    let vmax = 0;
+    for (let i = np3; i < n3; i += 3) {
+      if (x[i + 1] < 0.02) x[i + 1] = 0.02;
+      v[i] = (x[i] - p[i]) * ih; v[i + 1] = (x[i + 1] - p[i + 1]) * ih; v[i + 2] = (x[i + 2] - p[i + 2]) * ih;
+    }
+    const E = K.edges;
+    for (let e = 0; e < K.ne; e++) {
+      const a = E[e * 2], b = E[e * 2 + 1], i = a * 3, j = b * 3, wa = im[a], wb = im[b]; if (wa + wb === 0) continue;
+      const dx = x[j] - x[i], dy = x[j + 1] - x[i + 1], dz = x[j + 2] - x[i + 2], l2 = dx * dx + dy * dy + dz * dz; if (l2 < 1e-12) continue;
+      const rv = ((v[j] - v[i]) * dx + (v[j + 1] - v[i + 1]) * dy + (v[j + 2] - v[i + 2]) * dz) / l2, s = cd * rv / (wa + wb);
+      v[i] += dx * s * wa; v[i + 1] += dy * s * wa; v[i + 2] += dz * s * wa; v[j] -= dx * s * wb; v[j + 1] -= dy * s * wb; v[j + 2] -= dz * s * wb;
+    }
+    for (let i = np3; i < n3; i += 3) {
+      const s2 = v[i] * v[i] + v[i + 1] * v[i + 1] + v[i + 2] * v[i + 2];
+      if (s2 > VMAX * VMAX) { const s = VMAX / Math.sqrt(s2); v[i] *= s; v[i + 1] *= s; v[i + 2] *= s; }
+      if (s2 > vmax) vmax = s2;
+    }
+    K.vmax = vmax;
+  }
+  W.time += h;
+}
+// after a batch of substeps: how far each key is pressed, who may go back to sleep
+function afterStep(W, dt) {
+  for (const K of W.keys) {
+    if (K.awake <= 0) continue;
+    let dep = 0, bad = false; const x = K.x, top = (K.ny - 1) * K.nz * K.nx * 3;
+    for (let i = top; i < K.n * 3; i += 3) { const d = KH - x[i + 1]; if (d > dep) dep = d; if (!(Math.abs(x[i] + x[i + 1] + x[i + 2]) < 1e4)) bad = true; }
+    if (bad) { K.x.set(K.rest); K.p.set(K.rest); K.v.fill(0); for (let t = 0; t < K.nt; t++) { K.tR[t * 4] = K.tR[t * 4 + 1] = K.tR[t * 4 + 2] = 0; K.tR[t * 4 + 3] = 1; } dep = 0; }
+    K.depress = dep; K.dirty = true;
+    let touched = false;
+    for (const F of W.fingers.values()) if (Math.abs(F.x - K.cx) < K.w / 2 + FR + 0.1 && Math.abs(F.z - K.cz) < K.d / 2 + FR + 0.1) touched = true;
+    if (touched || K.vmax > 0.0004) K.awake = 1.2; else { K.awake -= dt; if (K.awake <= 0) { K.x.set(K.rest); K.p.set(K.rest); K.v.fill(0); } }
+  }
+}
+function wake(W) { for (const F of W.fingers.values()) for (const K of W.keys) if (Math.abs(F.x - K.cx) < K.w / 2 + FR + 0.1 && Math.abs(F.z - K.cz) < K.d / 2 + FR + 0.1 && K.awake <= 0) K.awake = 1.2; }
+function kinetic(W) { let ke = 0, awake = 0; for (const K of W.keys) { if (K.awake <= 0) continue; awake++; for (let i = 0; i < K.n; i++) ke += 0.5 * K.m[i] * (K.v[i * 3] ** 2 + K.v[i * 3 + 1] ** 2 + K.v[i * 3 + 2] ** 2); } return { ke, awake }; }
+
+// ───────────────────────── app: rendering, touch, sound, UI ─────────────────────────
+THREE.ColorManagement.enabled = false;
+const $ = (id) => document.getElementById(id);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const state = { jitter: 3, sound: true, showMesh: false, text: '', strokes: 0 };
+
+function neutralTM(c) {
+  const sc = 0.8 - 0.04, de = 0.15; let [r, g, b] = c;
+  const x = Math.min(r, g, b), off = x < 0.08 ? x - 6.25 * x * x : 0.04; r -= off; g -= off; b -= off;
+  const peak = Math.max(r, g, b); if (peak < sc) return [r, g, b];
+  const d = 1 - sc, np = 1 - d * d / (peak + d - sc), s = np / peak; r *= s; g *= s; b *= s;
+  const k = 1 - 1 / (de * (peak - np) + 1);
+  return [r + (np - r) * k, g + (np - g) * k, b + (np - b) * k];
+}
+const s2l = (v) => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+const l2s = (v) => v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+const SWEEP = (() => {
+  const target = [0xF2, 0xEC, 0xE2].map(v => s2l(v / 255)); let c = target.slice();
+  for (let i = 0; i < 40; i++) { const t = neutralTM(c); c = c.map((v, k) => v + (target[k] - t[k])); }
+  return c;
+})();
+const SWEEP_DARK = [0.05, 0.043, 0.04];
+let sweepNow = SWEEP;
+function applyPaper() {
+  const t = neutralTM(sweepNow).map(v => Math.round(Math.min(1, Math.max(0, l2s(v))) * 255));
+  document.documentElement.style.setProperty('--paper', `rgb(${t[0]},${t[1]},${t[2]})`);
+}
+applyPaper();
+
+const canvas = $('gl');
+let renderer = null;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' });
+  const gl = renderer.getContext();
+  if (!(gl instanceof WebGL2RenderingContext) || !gl.getExtension('EXT_color_buffer_float')) throw new Error('no float targets');
+} catch (e) { renderer = null; }
+if (!renderer) { document.body.classList.add('nogl'); $('status').textContent = 'WEBGL 2 · UNAVAILABLE'; throw new Error('These keys need WebGL 2.'); }
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping; renderer.autoClear = false;
+const coarse = matchMedia('(pointer: coarse)').matches;
+const SM = coarse ? 1024 : 1536, EXT = 18;
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+const CAM0 = { az: 0, el: matchMedia('(max-width: 820px)').matches ? 1.16 : 1.0, zoom: 1 };
+const cam = { ...CAM0, dist: 14, target: new THREE.Vector3(0, 0.15, 0), free: { x: 0, y: 0, w: 1, h: 1, W: 1, H: 1 } };
+const KEY_DIR = new THREE.Vector3(-1.4, 4.2, -1.9).normalize();
+const lightCam = new THREE.OrthographicCamera(-EXT / 2, EXT / 2, EXT / 2, -EXT / 2, 0.5, 30);
+const heightCam = new THREE.OrthographicCamera(-EXT / 2, EXT / 2, EXT / 2, -EXT / 2, 0.1, 12); heightCam.up.set(0, 0, 1);
+const fsCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+lightCam.position.copy(cam.target).addScaledVector(KEY_DIR, 15); lightCam.lookAt(cam.target); lightCam.updateMatrixWorld();
+heightCam.position.set(0, -2, 0); heightCam.lookAt(0, 0, 0); heightCam.updateMatrixWorld();
+
+const rtShadow = new THREE.WebGLRenderTarget(SM, SM, { type: THREE.FloatType, format: THREE.RGFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+const rtHeight = new THREE.WebGLRenderTarget(512, 512, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+const rtScene = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+const rtJelly = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+const rtBack = new THREE.WebGLRenderTarget(4, 4, { type: THREE.FloatType, format: THREE.RedFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+const rtJellyA = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+const rtComp = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
+const rtB1 = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
+const rtB2 = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
+
+// legend atlas
+const atlasCanvas = document.createElement('canvas'); atlasCanvas.width = 2048; atlasCanvas.height = 2048;
+const atlas = new THREE.CanvasTexture(atlasCanvas); atlas.minFilter = THREE.LinearMipmapLinearFilter; atlas.generateMipmaps = true; atlas.anisotropy = 8;
+function drawAtlas(keys) {
+  const c = atlasCanvas.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, 2048, 2048); c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (const K of keys) {
+    if (!K.label) continue;
+    const x = (K.index % 8) * 256 + 128, y = Math.floor(K.index / 8) * 256 + 128, sym = K.label.length === 1 && !/[A-Z0-9.]/.test(K.label);
+    c.font = sym ? "700 170px 'IBM Plex Mono', ui-monospace, Menlo, monospace" : "600 190px 'Fraunces', Georgia, 'Times New Roman', serif";
+    c.fillText(K.label, x, y + (K.label === '.' ? -44 : 12));
+  }
+  atlas.needsUpdate = true;
+}
+
+const U = {
+  uSweep: { value: new THREE.Vector3(...SWEEP) },
+  tScene: { value: rtScene.texture }, tBack: { value: rtBack.texture }, tShadow: { value: rtShadow.texture }, tHeight: { value: rtHeight.texture }, tJelly: { value: rtJelly.texture }, tAtlas: { value: atlas },
+  uRes: { value: new THREE.Vector2(1, 1) }, uProj: { value: 1 },
+  uLightVP: { value: new THREE.Matrix4().multiplyMatrices(lightCam.projectionMatrix, lightCam.matrixWorldInverse) },
+  uHeightVP: { value: new THREE.Matrix4().multiplyMatrices(heightCam.projectionMatrix, heightCam.matrixWorldInverse) },
+  uVP: { value: new THREE.Matrix4() }, uLightRange: { value: 29.5 }, uLightExtent: { value: EXT }, uShadowTexel: { value: 1 / SM },
+  tJellyA: { value: rtJellyA.texture }, tComp: { value: rtComp.texture }, tBloom: { value: rtB1.texture }, uBRes: { value: new THREE.Vector2(1, 1) }, uFocus: { value: 10 }, uDofK: { value: 0.3 }, uPlate: { value: 0 }, uDim: { value: 0 },
+  uKeyDir: { value: KEY_DIR }, uKeyCol: { value: new THREE.Vector3(0.82, 0.8, 0.76) }, uKind: { value: 1 },
+};
+const mk = (fs, extra = {}, uni = null) => new THREE.ShaderMaterial({ uniforms: uni ? { ...U, ...uni } : U, vertexShader: VS_K, fragmentShader: fs, blending: THREE.NoBlending, ...extra });
+const matShadow = mk(FS_SHADOW, { side: THREE.DoubleSide });
+const matHeight = mk(FS_HEIGHT, { side: THREE.DoubleSide });
+const matBack = mk(FS_BACK, { side: THREE.BackSide, depthFunc: THREE.GreaterDepth });
+const matDepth = mk(FS_NONE, { side: THREE.DoubleSide, colorWrite: false });
+const matFloor = mk(FS_FLOOR), matLegend = mk(FS_LEGEND, { side: THREE.DoubleSide, blending: THREE.NormalBlending, transparent: true, depthWrite: false }), matJelly = mk(FS_JELLY);
+const halfRes = new THREE.Vector2(1, 1);
+const matJellyA = mk(FS_JELLY, { defines: { PASS_A: 1 } }, { uRes: { value: halfRes } });
+const matPlate = mk(FS_FLOOR, {}, { uPlate: { value: 1 } }), matBubble = mk(FS_BUBBLE), matShadowO = mk(FS_SHADOW, { side: THREE.DoubleSide }, { uKind: { value: 0 } });
+const fsMat = (fs, uni = null) => new THREE.ShaderMaterial({ uniforms: uni ? { ...U, ...uni } : U, vertexShader: VS_FS, fragmentShader: fs, depthTest: false, depthWrite: false, blending: THREE.NoBlending });
+const matPost = fsMat(FS_POST), matComp = fsMat(FS_COMP), matBright = fsMat(FS_BRIGHT);
+const matBlurH = fsMat(FS_BLUR, { tSrc: { value: rtB1.texture }, uDir: { value: new THREE.Vector2(1, 0) } }), matBlurV = fsMat(FS_BLUR, { tSrc: { value: rtB2.texture }, uDir: { value: new THREE.Vector2(0, 1) } });
+const matWire = new THREE.LineBasicMaterial({ color: 0x2b211a, transparent: true, opacity: 0.45, depthTest: false });
+
+// ── build the keyboard ──
+const STACKED = matchMedia('(max-width: 820px)').matches;
+world.keys = layoutKeys(false); world.keys.forEach(buildLattice);
+const S = buildSkins(world.keys);
+world.np = world.keys.reduce((s, k) => s + k.n, 0); world.nt = world.keys.reduce((s, k) => s + k.nt, 0);
+for (const K of world.keys) skinKey(K, S);
+const sJelly = new THREE.Scene(), sInner = new THREE.Scene(), sFloor = new THREE.Scene(), sWire = new THREE.Scene(), sPost = new THREE.Scene(), sPlate = new THREE.Scene(), sBub = new THREE.Scene();
+let jellyMesh = null, postMesh = null, bubMesh = null;
+const FLOOR_Y = -0.15;
+const gJelly = new THREE.BufferGeometry(), gLegend = new THREE.BufferGeometry(), gWire = new THREE.BufferGeometry();
+{
+  const dyn = (a, n) => new THREE.BufferAttribute(a, n).setUsage(THREE.DynamicDrawUsage), zero = (n, k) => new THREE.BufferAttribute(new Float32Array(n * k), k);
+  gJelly.setAttribute('position', dyn(S.pos, 3)); gJelly.setAttribute('normal', dyn(S.nrm, 3));
+  gJelly.setAttribute('aRest', new THREE.BufferAttribute(S.rest, 3)); gJelly.setAttribute('aAbs', new THREE.BufferAttribute(S.abs, 3));
+  gJelly.setAttribute('aAlb', new THREE.BufferAttribute(S.alb, 3)); gJelly.setAttribute('aTint', new THREE.BufferAttribute(S.tint, 3));
+  gJelly.setAttribute('uv', zero(S.pos.length / 3, 2)); gJelly.setAttribute('aId', new THREE.BufferAttribute(S.ids, 1)); gJelly.setIndex(new THREE.BufferAttribute(S.index, 1));
+  const nl = S.lpos.length / 3;
+  gLegend.setAttribute('position', dyn(S.lpos, 3)); gLegend.setAttribute('uv', new THREE.BufferAttribute(S.luv, 2));
+  for (const n of ['normal', 'aRest', 'aAbs', 'aTint']) gLegend.setAttribute(n, zero(nl, 3));
+  gLegend.setAttribute('aAlb', new THREE.BufferAttribute(S.lcol, 3));
+  gLegend.setIndex(new THREE.BufferAttribute(S.lindex, 1));
+  const fg = new THREE.PlaneGeometry(600, 600); fg.rotateX(-Math.PI / 2); fg.translate(0, FLOOR_Y, 0);
+  for (const n of ['aRest', 'aAbs', 'aAlb', 'aTint']) fg.setAttribute(n, zero(4, 3));
+  const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
+  const add = (sc, g, m) => { const o = new THREE.Mesh(g, m); o.frustumCulled = false; sc.add(o); return o; };
+  jellyMesh = add(sJelly, gJelly, matJelly); add(sInner, gLegend, matLegend); add(sFloor, fg, matFloor); postMesh = add(sPost, tg, matPost);
+  // the plate the keys stand on: a rounded slab with a softly bevelled edge
+  const px = world.hx + 0.34, pz = world.hz + 0.34, pr = 0.36, sh = new THREE.Shape();
+  sh.moveTo(-px + pr, -pz); sh.lineTo(px - pr, -pz); sh.absarc(px - pr, -pz + pr, pr, -Math.PI / 2, 0); sh.lineTo(px, pz - pr); sh.absarc(px - pr, pz - pr, pr, 0, Math.PI / 2);
+  sh.lineTo(-px + pr, pz); sh.absarc(-px + pr, pz - pr, pr, Math.PI / 2, Math.PI); sh.lineTo(-px, -pz + pr); sh.absarc(-px + pr, -pz + pr, pr, Math.PI, Math.PI * 1.5);
+  const pg = new THREE.ExtrudeGeometry(sh, { depth: -FLOOR_Y - 0.04, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 4, curveSegments: 14 });
+  pg.rotateX(-Math.PI / 2); pg.translate(0, FLOOR_Y, 0);
+  add(sPlate, pg, matPlate);
+  bubMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 2), matBubble, S.bub.length / 4); bubMesh.frustumCulled = false; sBub.add(bubMesh);
+  const wp = new Float32Array(world.np * 3), wi = []; let o = 0;
+  for (const K of world.keys) { K.w0 = o; for (let e = 0; e < K.ne * 2; e++) wi.push(K.edges[e] + o); o += K.n; }
+  gWire.setAttribute('position', dyn(wp, 3)); gWire.setIndex(wi);
+  const wl = new THREE.LineSegments(gWire, matWire); wl.frustumCulled = false; sWire.add(wl);
+}
+drawAtlas(world.keys);
+if (document.fonts && document.fonts.ready) Promise.race([document.fonts.load("600 100px Fraunces"), new Promise(r => setTimeout(r, 2500))]).then(() => drawAtlas(world.keys)).catch(() => {});
+
+// ── sound: a synthesised keyboard "thock" (soft click + low body + short clack), lighter tick on release ──
+let actx = null, master = null, noiseBuf = null;
+function audio() {
+  if (!state.sound) return null;
+  try {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+      actx = new AC(); master = actx.createDynamicsCompressor(); master.threshold.value = -14; master.ratio.value = 4; master.attack.value = 0.002; master.release.value = 0.08;
+      const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 12000; master.connect(lp); lp.connect(actx.destination);
+      noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.5, actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (actx.state === 'suspended') actx.resume().catch(() => {});
+    return actx;
+  } catch (e) { return null; }
+}
+function burst(a, t, type, f0, f1, q, gain, dur) {
+  const n = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain(); n.buffer = noiseBuf; bp.type = type; bp.Q.value = q;
+  bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  n.connect(bp); bp.connect(g); g.connect(master); n.start(t, state.steady ? 0.05 : Math.random() * 0.3); n.stop(t + dur + 0.02);
+}
+function tone(a, t, f0, f1, gain, dur) {
+  const o = a.createOscillator(), g = a.createGain(); o.type = 'sine';
+  o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
+}
+// ten voices: p pitch, click = snap of a clicky switch, ring = its metallic ping, clack = mid knock, body = low thump, rel = release level
+const VOICES = [
+  { name: 'Blue · low', p: 0.8, click: 1, ring: 1, clack: 1, body: 1, rel: 1 },
+  { name: 'Blue · deeper', p: 0.66, click: 0.9, ring: 0.8, clack: 1, body: 1.2, rel: 0.9 },
+  { name: 'Blue · bright', p: 1, click: 1, ring: 1, clack: 1, body: 1, rel: 1 },
+  { name: 'Blue · soft click', p: 0.74, click: 0.55, ring: 0.5, clack: 1.1, body: 1.3, rel: 0.6 },
+  { name: 'Green · heavy click', p: 0.7, click: 1.3, ring: 1.2, clack: 1.3, body: 1.5, rel: 1.1 },
+  { name: 'Brown · tactile', p: 0.72, click: 0.22, ring: 0.1, clack: 1.3, body: 1.5, rel: 0.45 },
+  { name: 'Red · smooth', p: 0.78, click: 0.08, ring: 0, clack: 1.0, body: 1.5, rel: 0.3 },
+  { name: 'Cream · thock', p: 0.58, click: 0.05, ring: 0, clack: 0.9, body: 2.0, rel: 0.25 },
+  { name: 'Typewriter', p: 0.9, click: 1.2, ring: 1.8, clack: 1.6, body: 0.8, rel: 0.5, ringLen: 3 },
+  { name: 'Jelly plop', p: 0.7, click: 0, ring: 0, clack: 0.25, body: 0, rel: 0.5, plop: 1 },
+];
+let voice = VOICES[7];
+function plop(K, down) {
+  const a = audio(); if (!a) return;
+  try {
+    const V = voice, t = a.currentTime + 0.001, big = state.steady ? 1 : K.w > 1 ? (K.w > 3 ? 0.62 : 0.8) : 1, v = (state.steady ? 1 : 1 + (Math.random() * 2 - 1) * state.jitter / 100) * big * V.p, rl = V.ringLen || 1;
+    if (V.plop) {
+      if (down) { tone(a, t, 330 * v, 120 * v, 0.6, 0.16); burst(a, t, 'bandpass', 700 * v, 240 * v, 2.5, 0.14, 0.08); }
+      else tone(a, t, 150 * v, 270 * v, 0.2, 0.09);
+      return;
+    }
+    if (down) {
+      if (V.click > 0) burst(a, t, 'highpass', 5200 * v, 4200 * v, 0.8, 0.34 * V.click, 0.007);
+      if (V.ring > 0) { tone(a, t, 4300 * v, 3900 * v, 0.2 * V.ring, 0.016 * rl); tone(a, t, 6100 * v, 5600 * v, 0.1 * V.ring, 0.011 * rl); }
+      burst(a, t + 0.001, 'bandpass', 2600 * v, 2100 * v, 3.5, 0.3 * Math.max(V.click, 0.25), 0.02);
+      burst(a, t + 0.013, 'bandpass', 1150 * v, 700 * v, 2.2, 0.36 * V.clack, 0.035);
+      tone(a, t + 0.013, 250 * v, 150 * v, 0.34 * V.body, 0.06 + 0.02 * (V.body - 1));
+    } else {
+      if (V.click > 0.15) { burst(a, t, 'highpass', 4800 * v, 3900 * v, 0.8, 0.2 * V.rel, 0.006); tone(a, t, 3700 * v, 3400 * v, 0.11 * V.rel * Math.min(1, V.ring), 0.013); }
+      burst(a, t + 0.008, 'bandpass', 1700 * v, 1200 * v, 2.4, 0.16 * V.rel, 0.022);
+    }
+  } catch (e) { /* sound is optional */ }
+}
+
+// ── typing ──
+function showText() {
+  const el = $('typed'), empty = !state.text; el.classList.toggle('empty', empty);
+  el.firstChild.textContent = empty ? 'Soft enough to press. Type something.' : state.text;
+}
+function typeKey(K) {
+  state.strokes++;
+  if (K.ch === '\b') state.text = state.text.slice(0, -1); else state.text += K.ch;
+  if (state.text.length > 90) state.text = state.text.slice(-90);
+  showText(); $('r-strokes').textContent = state.strokes;
+}
+
+// ── fingers ──
+const BOUND = { x: world.hx + 0.15, z: world.hz + 0.15 };
+function nearKeys(p) { if (!p) return false; for (const K of world.keys) if (Math.abs(p[0] - K.cx) < K.w / 2 + 0.3 && Math.abs(p[1] - K.cz) < K.d / 2 + 0.3) return true; return false; }
+function pointerRay(cx, cy) {
+  const r = canvas.getBoundingClientRect(), v = new THREE.Vector3((cx - r.left) / r.width * 2 - 1, -((cy - r.top) / r.height) * 2 + 1, 0.5).unproject(camera), o = camera.position, d = v.sub(o).normalize();
+  const t = (KH - 0.08 - o.y) / d.y; return t > 0 && isFinite(t) ? [o.x + d.x * t, o.z + d.z * t] : null;
+}
+function fingerDown(id, x, z, now) { world.fingers.set(id, { x, z, depth: 0.04, release: false, minUntil: now + 0.1 }); wake(world); audio(); }
+function fingerUp(id) { const F = world.fingers.get(id); if (F) F.release = true; }
+function keyAt(x, z) { for (const K of world.keys) if (Math.abs(x - K.cx) < K.w / 2 + 0.07 && Math.abs(z - K.cz) < K.d / 2 + 0.07) return K; return null; }
+
+// ── camera ──
+function updateFree() {
+  const r = canvas.getBoundingClientRect(), W = r.width, H = r.height, stacked = matchMedia('(max-width: 820px)').matches;
+  const mh = $('masthead').getBoundingClientRect();
+  let x0 = W * (stacked ? 0.012 : 0.03), x1 = W - x0, y0 = mh.bottom - r.top + 6, y1 = H - 12;
+  if (!stacked) { x1 = $('panel').getBoundingClientRect().left - r.left - 10; y1 = $('readouts').getBoundingClientRect().top - r.top - 6; }
+  if (y1 - y0 < 150) y0 = y1 - 150;
+  cam.free = { x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: Math.max(160, x1 - x0), h: y1 - y0, W, H };
+}
+function updateCamera(dt, snap) {
+  const F = cam.free, tanV = Math.tan(camera.fov * Math.PI / 360);
+  const dW = (world.hx + 0.2) / (tanV * F.w / F.H), dH = ((world.hz + 0.17) * Math.sin(cam.el) + 0.45 * Math.cos(cam.el)) * 1.16 / (tanV * F.h / F.H);
+  const want = Math.max(dW, dH) * cam.zoom + 2.0 * Math.cos(cam.el), k = snap || reduceMotion ? 1 : 1 - Math.exp(-dt * 6);
+  cam.dist += (want - cam.dist) * k;
+  const ce = Math.cos(cam.el), se = Math.sin(cam.el);
+  camera.position.set(cam.target.x + Math.sin(cam.az) * ce * cam.dist, cam.target.y + se * cam.dist, cam.target.z + Math.cos(cam.az) * ce * cam.dist);
+  camera.lookAt(cam.target); camera.aspect = F.W / F.H;
+  camera.setViewOffset(F.W, F.H, F.W / 2 - F.x, F.H / 2 - F.y, F.W, F.H);
+  camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+  U.uVP.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); U.uProj.value = 1 / tanV;
+  U.uFocus.value = cam.dist + 0.2; U.uDofK.value = 0.2 / cam.zoom;
+}
+function resize() {
+  const r = canvas.getBoundingClientRect(); if (r.width < 2 || r.height < 2) return;
+  let dpr = Math.min(window.devicePixelRatio || 1, coarse ? 1.75 : 2);
+  const px = r.width * r.height * dpr * dpr; if (px > 3.0e6) dpr *= Math.sqrt(3.0e6 / px);
+  renderer.setPixelRatio(dpr); renderer.setSize(r.width, r.height, false);
+  const w = canvas.width, h = canvas.height; rtScene.setSize(w, h); rtJelly.setSize(w, h); rtBack.setSize(w, h); rtComp.setSize(w, h); U.uRes.value.set(w, h);
+  const hw = Math.max(2, w >> 1), hh = Math.max(2, h >> 1), qw = Math.max(2, w >> 2), qh = Math.max(2, h >> 2);
+  rtJellyA.setSize(hw, hh); halfRes.set(hw, hh); rtB1.setSize(qw, qh); rtB2.setSize(qw, qh); U.uBRes.value.set(qw, qh);
+  updateFree();
+}
+
+// ── frame ──
+function renderFrame() {
+  const sweepCol = renderFrame.c || (renderFrame.c = new THREE.Color()); sweepCol.setRGB(sweepNow[0], sweepNow[1], sweepNow[2]);
+  const R = (sc, c) => renderer.render(sc, c);
+  renderer.setRenderTarget(rtShadow); renderer.setClearColor(0xffffff, 1); renderer.clear();
+  sJelly.overrideMaterial = matShadow; R(sJelly, lightCam); sPlate.overrideMaterial = matShadowO; R(sPlate, lightCam); sPlate.overrideMaterial = null;
+  renderer.setRenderTarget(rtHeight); renderer.setClearColor(0xffffff, 1); renderer.clear();
+  sJelly.overrideMaterial = matHeight; R(sJelly, heightCam);
+  renderer.setRenderTarget(rtScene); renderer.setClearColor(sweepCol, 1); renderer.clear();
+  R(sFloor, camera); R(sPlate, camera); R(sBub, camera);
+  renderer.setRenderTarget(rtBack); renderer.setClearColor(0x000000, 0); renderer.state.buffers.depth.setClear(0); renderer.clear();
+  sJelly.overrideMaterial = matBack; R(sJelly, camera); renderer.state.buffers.depth.setClear(1);
+  sJelly.overrideMaterial = null;
+  const prepass = () => { sFloor.overrideMaterial = matDepth; sPlate.overrideMaterial = matDepth; R(sFloor, camera); R(sPlate, camera); sFloor.overrideMaterial = null; sPlate.overrideMaterial = null; };
+  // first a half-resolution look at every key, so keys can be seen through one another
+  renderer.setRenderTarget(rtJellyA); renderer.setClearColor(0x000000, 0); renderer.clear(); prepass();
+  jellyMesh.material = matJellyA; R(sJelly, camera); jellyMesh.material = matJelly;
+  renderer.setRenderTarget(rtJelly); renderer.setClearColor(0x000000, 0); renderer.clear(); prepass();
+  R(sJelly, camera); R(sInner, camera);
+  // composite → bloom → depth of field, tone mapping, grain
+  const pass = (m, rt) => { postMesh.material = m; renderer.setRenderTarget(rt); R(sPost, fsCam); };
+  pass(matComp, rtComp); pass(matBright, rtB1); pass(matBlurH, rtB2); pass(matBlurV, rtB1); pass(matBlurH, rtB2); pass(matBlurV, rtB1); pass(matPost, null);
+  if (state.showMesh) R(sWire, camera);
+}
+let last = performance.now(), acc = 0, statT = 1, first = true, simNow = 0;
+const kicks = [];
+function stepFrame(dt) {
+  simNow += dt;
+  for (const [id, F] of world.fingers) {
+    if (F.release && simNow >= F.minUntil) { F.depth -= dt * 2.6; if (F.depth < 0.02) world.fingers.delete(id); continue; }   // the finger lifts; the jelly follows a beat behind
+    F.depth += (PRESS - F.depth) * (1 - Math.exp(-dt * 38));
+  }
+  for (let i = kicks.length - 1; i >= 0; i--) if (simNow >= kicks[i].t) {
+    const K = kicks[i].K; K.awake = 1.5; const top = (K.ny - 1) * K.nz * K.nx;
+    for (let j = top; j < K.n; j++) K.v[j * 3 + 1] += 2.6; for (let j = K.nx * K.nz; j < top; j++) K.v[j * 3 + 1] += 1.2;
+    kicks.splice(i, 1);
+  }
+  wake(world);
+  acc += dt; let n = Math.min(SUBSTEPS + 4, Math.floor(acc / HS)); acc -= n * HS; if (acc > HS * 6) acc = 0;
+  for (let i = 0; i < n; i++) substep(world);
+  afterStep(world, dt);
+  for (const K of world.keys) {
+    if (K.awake <= 0 && !K.dirty) continue;
+    let over = false; for (const F of world.fingers.values()) if (Math.abs(F.x - K.cx) < K.w / 2 + 0.07 && Math.abs(F.z - K.cz) < K.d / 2 + 0.07) over = true;
+    if (!K.down && over && K.depress > 0.12) { K.down = true; typeKey(K); plop(K, true); shiver(K); }
+    else if (K.down && (!over || K.depress < 0.06)) { K.down = false; plop(K, false); }
+  }
+}
+// neighbours feel a press: a small sympathetic wobble
+function shiver(K) {
+  for (const O of world.keys) {
+    if (O === K || Math.abs(O.cx - K.cx) > (O.w + K.w) / 2 + 0.3 || Math.abs(O.cz - K.cz) > 1.2) continue;
+    O.awake = 1.2; const dx = O.cx - K.cx, dz = O.cz - K.cz, l = Math.hypot(dx, dz) || 1;
+    for (let i = O.nx * O.nz; i < O.n; i++) { const f = O.rest[i * 3 + 1] / KH; O.v[i * 3] += 0.32 * f * dx / l; O.v[i * 3 + 1] -= 0.22 * f; O.v[i * 3 + 2] += 0.32 * f * dz / l; }
+  }
+}
+function tick(now) {
+  requestAnimationFrame(tick);
+  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+  stepFrame(dt);
+  let any = false;
+  for (const K of world.keys) if (K.dirty) { skinKey(K, S); K.dirty = false; any = true; if (state.showMesh) gWire.attributes.position.array.set(K.x, K.w0 * 3); }
+  if (any || first) {
+    const m4 = tick.m4 || (tick.m4 = new THREE.Matrix4());
+    for (let i = 0; i < S.bub.length / 4; i++) { const r = S.bub[i * 4 + 3]; m4.makeScale(r, r, r).setPosition(S.bpos[i * 3], S.bpos[i * 3 + 1], S.bpos[i * 3 + 2]); bubMesh.setMatrixAt(i, m4); }
+    bubMesh.instanceMatrix.needsUpdate = true;
+  }
+  if (any || first) { gJelly.attributes.position.needsUpdate = true; gJelly.attributes.normal.needsUpdate = true; gLegend.attributes.position.needsUpdate = true; if (state.showMesh) gWire.attributes.position.needsUpdate = true; }
+  statT += dt;
+  if (statT > 0.2) {
+    statT = 0; const s = kinetic(world), uj = s.ke * (32.768 * 1.3 / 1000) * 0.032 * 0.032 * 1e6;
+    $('r-awake').textContent = s.awake + ' / ' + world.keys.length; $('r-ke').textContent = uj < 0.05 ? '0.0' : uj.toFixed(1);
+  }
+  updateCamera(dt, first); renderFrame(); first = false;
+}
+
+// ── input ──
+const pointers = new Map(); let orbit = null, pinch = null;
+function pDown(id, cx, cy) {
+  const p = pointerRay(cx, cy), onKeys = nearKeys(p);
+  pointers.set(id, { x: cx, y: cy, finger: !!onKeys });
+  if (onKeys) { fingerDown('p' + id, p[0], p[1], simNow); return; }
+  const free = [...pointers.values()].filter(q => !q.finger);
+  if (free.length === 2) { pinch = { d: Math.hypot(free[0].x - free[1].x, free[0].y - free[1].y), z0: cam.zoom }; orbit = null; }
+  else if (free.length === 1) orbit = { id, x: cx, y: cy, az: cam.az, el: cam.el };
+}
+function pMove(id, cx, cy) {
+  const q = pointers.get(id); if (!q) return; q.x = cx; q.y = cy;
+  if (q.finger) { const p = pointerRay(cx, cy), F = world.fingers.get('p' + id); if (p && F) { F.x = Math.max(-BOUND.x - 0.5, Math.min(BOUND.x + 0.5, p[0])); F.z = Math.max(-BOUND.z - 0.5, Math.min(BOUND.z + 0.5, p[1])); } return; }
+  if (pinch) { const f = [...pointers.values()].filter(v => !v.finger); if (f.length === 2) cam.zoom = Math.max(0.6, Math.min(2.2, pinch.z0 * pinch.d / Math.max(20, Math.hypot(f[0].x - f[1].x, f[0].y - f[1].y)))); }
+  else if (orbit && orbit.id === id) { cam.az = Math.max(-1.2, Math.min(1.2, orbit.az - (cx - orbit.x) * 0.005)); cam.el = Math.max(0.35, Math.min(1.5, orbit.el + (cy - orbit.y) * 0.005)); }
+}
+function pUp(id) { const q = pointers.get(id); if (!q) return; pointers.delete(id); if (q.finger) fingerUp('p' + id); else { pinch = null; if (orbit && orbit.id === id) orbit = null; } }
+// mouse and pen come through pointer events; fingers through touch events, which keep a held key held until the finger really lifts
+canvas.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') return; try { canvas.setPointerCapture(e.pointerId); } catch (_) {} pDown('m' + e.pointerId, e.clientX, e.clientY); });
+canvas.addEventListener('pointermove', (e) => { if (e.pointerType !== 'touch') pMove('m' + e.pointerId, e.clientX, e.clientY); });
+canvas.addEventListener('pointerup', (e) => { if (e.pointerType !== 'touch') pUp('m' + e.pointerId); });
+canvas.addEventListener('pointercancel', (e) => { if (e.pointerType !== 'touch') pUp('m' + e.pointerId); });
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); for (const t of e.changedTouches) pDown('t' + t.identifier, t.clientX, t.clientY); }, { passive: false });
+canvas.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) pMove('t' + t.identifier, t.clientX, t.clientY); }, { passive: false });
+const tEnd = (e) => { e.preventDefault(); for (const t of e.changedTouches) pUp('t' + t.identifier); const live = new Set([...e.touches].map(t => 't' + t.identifier)); for (const id of [...pointers.keys()]) if (id[0] === 't' && !live.has(id)) pUp(id); };
+canvas.addEventListener('touchend', tEnd, { passive: false }); canvas.addEventListener('touchcancel', tEnd, { passive: false });
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.zoom = Math.max(0.6, Math.min(2.2, cam.zoom * Math.exp(e.deltaY * 0.0012))); }, { passive: false });
+canvas.addEventListener('dblclick', (e) => { const p = pointerRay(e.clientX, e.clientY); if (nearKeys(p)) return; cam.az = CAM0.az; cam.el = CAM0.el; cam.zoom = CAM0.zoom; });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('selectstart', (e) => e.preventDefault());
+const byCode = new Map(world.keys.map(k => [k.code, k])); for (const k of world.keys) if (k.alt) byCode.set(k.alt, k);
+addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const K = byCode.get(e.code); if (!K) return;
+  const tag = e.target.tagName; if (tag === 'INPUT' && e.target.type === 'range' || tag === 'TEXTAREA') return;
+  if ((tag === 'BUTTON' || tag === 'INPUT' || tag === 'A') && (e.code === 'Space' || e.code === 'Enter')) return;
+  e.preventDefault();
+  if (e.repeat && world.fingers.has('k' + e.code)) {
+    // held down on a real keyboard: keep typing at the system's repeat rate, with a little bounce
+    if (K.down) { typeKey(K); const F = world.fingers.get('k' + e.code); F.depth = Math.max(0.2, F.depth - 0.05); if (simNow - (K.lastRep || 0) > 0.04) { K.lastRep = simNow; plop(K, true); } }
+    return;
+  }
+  fingerDown('k' + e.code, K.cx, K.cz, simNow);
+});
+addEventListener('keyup', (e) => fingerUp('k' + e.code));
+addEventListener('blur', () => { for (const id of world.fingers.keys()) if (id[0] === 'k') fingerUp(id); });
+
+// ── panel ──
+function setFirmness(f) { world.alphaShape = Math.pow(10, 3.25 - 2.5 * f); $('firmV').textContent = f.toFixed(2); }
+function setDamping(d) { world.damp = Math.pow(10, -3.5 + 2.4 * d); $('dampV').textContent = d.toFixed(2); }
+function wave() { kicks.length = 0; for (const K of world.keys) kicks.push({ K, t: simNow + (K.cx + world.hx) * 0.045 + (K.cz + world.hz) * 0.03 }); }
+$('firm').addEventListener('input', (e) => setFirmness(+e.target.value));
+$('damp').addEventListener('input', (e) => setDamping(+e.target.value));
+$('wave').addEventListener('click', wave);
+$('clear').addEventListener('click', () => { state.text = ''; showText(); });
+{
+  const sel = $('voice'); VOICES.forEach((v, i) => sel.add(new Option((i + 1) + ' · ' + v.name, i)));
+  let saved = 7; try { const s = localStorage.getItem('jellykeys.voice'); if (s !== null) saved = +s; } catch (e) {}
+  if (!VOICES[saved]) saved = 7; voice = VOICES[saved]; sel.value = saved;
+  sel.addEventListener('change', () => {
+    voice = VOICES[+sel.value]; try { localStorage.setItem('jellykeys.voice', sel.value); } catch (e) {}
+    const K = world.keys[0]; plop(K, true); setTimeout(() => plop(K, false), 130);
+  });
+}
+$('sound').addEventListener('change', (e) => { state.sound = e.target.checked; if (state.sound) audio(); });
+function setJitter(j) { state.jitter = j; $('jitV').textContent = '±' + j + '%'; try { localStorage.setItem('jellykeys.jitter', j); } catch (_) {} }
+$('jit').addEventListener('input', (e) => setJitter(+e.target.value));
+$('jit').addEventListener('change', () => { const K = world.keys[0]; plop(K, true); });
+try { const j = localStorage.getItem('jellykeys.jitter'); if (j !== null && +j >= 0 && +j <= 20) { $('jit').value = +j; setJitter(+j); } } catch (_) {}
+$('steady').addEventListener('change', (e) => { state.steady = e.target.checked; $('jit').disabled = state.steady; try { localStorage.setItem('jellykeys.steady', state.steady ? '1' : '0'); } catch (_) {} });
+try { if (localStorage.getItem('jellykeys.steady') === '1') { state.steady = true; $('steady').checked = true; $('jit').disabled = true; } } catch (_) {}
+function setDim(on) {
+  sweepNow = on ? SWEEP_DARK : SWEEP; U.uSweep.value.set(sweepNow[0], sweepNow[1], sweepNow[2]);
+  U.uDim.value = on ? 1 : 0; document.documentElement.classList.toggle('dim', on); applyPaper(); matWire.color.set(on ? 0xefe7dc : 0x2b211a);
+  try { localStorage.setItem('jellykeys.dim', on ? '1' : '0'); } catch (_) {}
+}
+$('dim').addEventListener('change', (e) => setDim(e.target.checked));
+try { if (localStorage.getItem('jellykeys.dim') === '1') { $('dim').checked = true; setDim(true); } } catch (_) {}
+$('showmesh').addEventListener('change', (e) => { state.showMesh = e.target.checked; if (state.showMesh) { for (const K of world.keys) gWire.attributes.position.array.set(K.x, K.w0 * 3); gWire.attributes.position.needsUpdate = true; } });
+new ResizeObserver(resize).observe(canvas); addEventListener('resize', resize);
+setFirmness(0.5); setDamping(0.5); showText();
+$('r-mesh').textContent = world.np.toLocaleString('en-US') + ' / ' + world.nt.toLocaleString('en-US'); $('r-strokes').textContent = '0';
+resize();
+if (!reduceMotion) wave();
+requestAnimationFrame(tick);
+window.__kb = { U, world, state, cam, stepFrame, fingerDown, fingerUp, wave, advance(sec) { for (let t = 0; t < sec; t += 1 / 60) stepFrame(1 / 60); } };
+
+</script>
+</body>
+</html>
